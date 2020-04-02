@@ -9,6 +9,19 @@ export = (app: Application) => {
     app.log("Comment created")
     var owner = context.repo({}).owner
 
+    if(context.payload.comment.body == "summary"){
+      var result = await context.github.repos.listCommits(context.repo({per_page:30}))
+      console.log(result.data)
+      var commitSummary = ""
+      result.data.forEach(commit => {
+        commitSummary += "\n\n"+commit.commit.message.split("\n")[0]
+        if(commit.author.login != owner) commitSummary += " - By "+commit.author.login
+        console.log(commitSummary)
+      })
+      context.github.issues.createComment(context.issue({ body: commitSummary }))
+      return
+    }
+
     if (context.payload.comment.body != "merge translations") return
     if (context.payload.comment.user.login != owner) {
       await context.github.issues.createComment(context.issue({ body: 'Do not meddle in the affairs of wizards' }))
