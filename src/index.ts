@@ -10,15 +10,7 @@ export = (app: Application) => {
     var owner = context.repo({}).owner
 
     if(context.payload.comment.body == "summary"){
-      var result = await context.github.repos.listCommits(context.repo({per_page:30}))
-      console.log(result.data)
-      var commitSummary = ""
-      result.data.forEach(commit => {
-        commitSummary += "\n\n"+commit.commit.message.split("\n")[0]
-        if(commit.author.login != owner) commitSummary += " - By "+commit.author.login
-        console.log(commitSummary)
-      })
-      context.github.issues.createComment(context.issue({ body: commitSummary }))
+      await summarize(context, owner);
       return
     }
 
@@ -30,8 +22,6 @@ export = (app: Application) => {
 
     await createTranslationBranchIfNeeded(context)
 
-    await createTranslationPrIfNeeded(context, owner, translations);
-
     var ourPr = await context.github.pulls.get(context.repo({ pull_number: context.payload.issue.number }))
     if (ourPr.data.base.label != context.repo({}).owner + ":" + translations) {
       await context.github.pulls.update(context.repo({ pull_number: context.payload.issue.number, base: translations }))
@@ -42,7 +32,23 @@ export = (app: Application) => {
       await context.github.pulls.merge(context.repo({ pull_number: context.payload.issue.number, merge_method: "squash" }))
     }
     else await context.github.issues.createComment(context.issue({ body: 'Not mergable' }))
+
+    // Can't create a PR until we have at least 1 merge into translations branch - can't create a PR if no diff!
+    await createTranslationPrIfNeeded(context, owner, translations);
+
   })
+
+  
+async function summarize(context: Context<Webhooks.WebhookPayloadIssueComment>, owner: string) {
+  var result = await context.github.repos.listCommits(context.repo({ per_page: 30 }));
+  var commitSummary = "";
+  result.data.forEach(commit => {
+    commitSummary += "\n\n" + commit.commit.message.split("\n")[0];
+    if (commit.author.login != owner)
+      commitSummary += " - By " + commit.author.login;
+  });
+  context.github.issues.createComment(context.issue({ body: commitSummary }));
+}
 
   async function branchExists(context: Context<Webhooks.WebhookPayloadIssueComment>, branchName: String) {
     try {
@@ -86,5 +92,6 @@ export = (app: Application) => {
   // To get your app running against GitHub, see:
   // https://probot.github.io/docs/development/
 }
+
 
 
