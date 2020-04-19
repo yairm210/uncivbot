@@ -40,13 +40,32 @@ export = (app: Application) => {
 
   
 async function summarize(context: Context<Webhooks.WebhookPayloadIssueComment>, owner: string) {
-  var result = await context.github.repos.listCommits(context.repo({ per_page: 30 }));
+  var result = await context.github.repos.listCommits(context.repo({ per_page: 50 }));
   var commitSummary = "";
+  var ownerToCommits = new Map<String,Array<String>>()
+  var reachedPreviousVersion = false
   result.data.forEach(commit => {
-    commitSummary += "\n\n" + commit.commit.message.split("\n")[0];
-    if (commit.author.login != owner)
-      commitSummary += " - By " + commit.author.login;
+    if(reachedPreviousVersion) return
+    var author = commit.author.login
+    if(author=="uncivbot[bot]") return
+    var commitMessage = commit.commit.message.split("\n")[0];
+    if(commitMessage.match(/^\d+\.\d+\.\d+$/)){ // match EXACT version, like 3.4.55  ^ is for start-of-line, $ for end-of-line
+      reachedPreviousVersion=true
+      console.log(commitMessage)
+      return
+    }
+    if(commitMessage.startsWith("Merge ")) return
+    commitMessage = commitMessage.replace(/\(\#\d+\)/,"") // match PR auto-text, like (#2345)
+    if (author != owner){
+      if (ownerToCommits.get(author)==undefined) ownerToCommits.set(author,[])
+      ownerToCommits.get(author)?.push(commitMessage)
+    }
+    else commitSummary += "\n\n" + commitMessage
   });
+  ownerToCommits.forEach((commits,author)=>{
+    commitSummary += "\n\nBy "+author+":"
+    commits.forEach(commitMessage => {commitSummary+="\n- "+commitMessage})
+  })
   context.github.issues.createComment(context.issue({ body: commitSummary }));
 }
 
