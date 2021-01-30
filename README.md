@@ -2,6 +2,8 @@
 
 > A GitHub App built with [Probot](https://github.com/probot/probot) that Unciv automation
 
+This bot has been completely replaced by Github Actions on the main Unciv repo :)
+
 ## Setup
 
 ```sh
